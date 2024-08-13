@@ -46,7 +46,7 @@ def main(args):
 
             map = hp.alm2map(alms_beamed, nside=meta.nside)
             mu.write_map(f"{sims_dir}/cmb_{ms}_{id_sim:04d}.fits", map,
-                         dtype=np.float32)
+                         dtype=np.float32, convert_muK_to_K=True)
             hp.write_cl(f"{sims_dir}/cl_{ms}_{id_sim:04d}.fits",
                         hp.anafast(map), overwrite=True, dtype=np.float32)
 
