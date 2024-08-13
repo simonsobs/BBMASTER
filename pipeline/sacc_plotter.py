@@ -4,7 +4,9 @@ import argparse
 from itertools import product
 import sacc
 import numpy as np
+import healpy as hp
 import pymaster as nmt
+import os
 
 
 def load_bpwins(coupling_file):
@@ -43,8 +45,8 @@ def multipole_min_from_tf(tf_file, field_pairs, snr_cut=3.):
 
 
 def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
-                  add_theory=False, lth=None, clth=None,
-                  cbth=None, save_file=None):
+                  cb_data=None, cb_data_err=None, add_theory=False,
+                  lth=None, clth=None, cbth=None, save_file=None):
     """
     """
     plt.figure(figsize=(8, 6))
@@ -62,17 +64,28 @@ def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
     main.set_title(title)
 
     fac = lb * (lb + 1) / (2 * np.pi)
+    offset = 0 if cb_data is None else 1
 
     if add_theory:
         fac_th = lth * (lth + 1) / (2 * np.pi)
-        main.plot(lth, fac_th * clth, c="darkgray", ls="-.", lw=2.6)
+        main.plot(lth, fac_th * clth, c="darkgray", ls="-.", lw=2.6,
+                  label="theory")
 
     main.errorbar(
-        lb, fac * cb, yerr=fac * cb_err, marker="o", ls="None",
-        markerfacecolor="white", markeredgecolor="navy",
+        lb-offset, fac * cb, yerr=fac * cb_err, marker="o", ls="None",
+        markerfacecolor="white", markeredgecolor="navy", label="sims",
         elinewidth=1.75, ecolor="navy", markeredgewidth=1.75
     )
 
+    if cb_data is not None:
+        main.errorbar(
+            lb+offset, fac * cb_data, yerr=fac * cb_data_err, marker="o",
+            ls="None", markerfacecolor="white", markeredgecolor="darkorange",
+            elinewidth=1.75, ecolor="darkorange", markeredgewidth=1.75,
+            label="data"
+        )
+
+    main.legend(fontsize=13)
     main.set_xlim(*xlim)
 
     if add_theory:
@@ -80,9 +93,18 @@ def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
         sub.axhspan(-2, 2, color="gray", alpha=0.4)
         sub.axhspan(-1, 1, color="gray", alpha=0.8)
 
-        sub.plot(lb, (cb - cbth) / cb_err, marker="o", ls="None",
-                 markerfacecolor="white", markeredgecolor="navy",
-                 markeredgewidth=1.75)
+        sub.plot(
+            lb-offset, (cb - cbth) / cb_err, marker="o", ls="None",
+            markerfacecolor="white", markeredgecolor="navy",
+            markeredgewidth=1.75
+        )
+        if cb_data is not None:
+            sub.plot(
+                lb+offset, (cb_data - cbth) / cb_data_err,
+                marker="o", ls="None",
+                markerfacecolor="white", markeredgecolor="darkorange",
+                markeredgewidth=1.75
+            )
 
         sub.set_xlim(*xlim)
         sub.set_ylim(-4.5, 4.5)
@@ -92,6 +114,7 @@ def plot_spectrum(lb, cb, cb_err, title, ylabel, xlim,
     else:
         plt.tight_layout()
         plt.show()
+    plt.close()
 
 
 def main(args):
@@ -114,24 +137,14 @@ def main(args):
     nmt_binning = nmt.NmtBin.from_edges(binning["bin_low"],
                                         binning["bin_high"] + 1)
     lb = nmt_binning.get_effective_ells()
+    lmax = 3*meta.nside - 1
 
     field_pairs = [m1+m2 for m1, m2 in product("TEB", repeat=2)]
     ps_names = meta.get_ps_names_list(type="all", coadd=True)
 
     types = {"T": "0", "E": "e", "B": "b"}
 
-    if args.data:
-        Nsims = 1
-    elif args.sims:
-        Nsims = meta.covariance["cov_num_sims"]
-
-    psth = np.load(meta.covariance["fiducial_cmb"])
-    ps_th = {}
-    for field_pair in field_pairs:
-        if field_pair in psth:
-            ps_th[field_pair] = psth[field_pair]
-        else:
-            ps_th[field_pair] = psth[field_pair[::-1]]
+    Nsims = meta.covariance["cov_num_sims"]
 
     # Transfer function
     idx_bad_tf = {}
@@ -150,12 +163,7 @@ def main(args):
         bpw_file = f"couplings_{ms1}_{ms2}.npz"
         bpw_mats[ms1, ms2] = load_bpwins(f"{coupling_dir}/{bpw_file}")
 
-    clth_binned = {
-        (ms1, ms2): binned_theory_from_unbinned(ps_th, bpw_mat)
-        for (ms1, ms2), bpw_mat in bpw_mats.items()
-    }
-
-    plot_data = {
+    plot_sims = {
         (ms1, ms2, fp): {
             "x": None,
             "y": [],
@@ -169,29 +177,68 @@ def main(args):
         for fp in field_pairs
     }
 
-    if args.sims:
-        # Load theory
-        for ms1, ms2 in ps_names:
-            ftag1 = meta.filtering_tag_from_map_set(ms1)
-            ftag2 = meta.filtering_tag_from_map_set(ms2)
+    fiducial_cmb = meta.covariance["fiducial_cmb"]
+    fiducial_dust = meta.covariance["fiducial_dust"]
+    fiducial_synch = meta.covariance["fiducial_synch"]
 
-            for fp in field_pairs:
-                mask_th = (psth["l"] <= 2 * meta.nside - 1)
-                x_th, y_th = psth["l"][mask_th], ps_th[fp][mask_th]
+    for ms1, ms2 in ps_names:
+        nu1 = meta.freq_tag_from_map_set(ms1)
+        nu2 = meta.freq_tag_from_map_set(ms2)
 
-                idx_bad = idx_bad_tf[ftag1, ftag2][fp]
-                mask = ((np.arange(len(lb)) > idx_bad) &
-                        (lb <= 2 * meta.nside - 1))
-                th_binned = clth_binned[ms1, ms2][fp][mask]
+        clth = {}
 
-                plot_data[ms1, ms2, fp]["x_th"] = x_th
-                plot_data[ms1, ms2, fp]["y_th"] = y_th
-                plot_data[ms1, ms2, fp]["th_binned"] = th_binned
+        for i, fp in enumerate(["TT", "EE", "BB", "TE"]):
+            cmb_cl = hp.read_cl(fiducial_cmb)[i, :lmax+1]
+            dust_cl = hp.read_cl(
+                fiducial_dust.format(nu1=nu1, nu2=nu2)
+            )[i, :lmax+1]
+            synch_cl = hp.read_cl(
+                fiducial_synch.format(nu1=nu1, nu2=nu2)
+            )[i, :lmax+1]
+            clth[fp] = (cmb_cl + dust_cl + synch_cl)
+        clth["EB"] = np.zeros(lmax+1)
+        clth["TB"] = np.zeros(lmax+1)
+        clth["l"] = np.arange(lmax+1)
 
-    for id_sim in range(Nsims):
-        sim_label = f"_{id_sim:04d}" if args.sims else ""
+        cl_th = {}
+        for fp in field_pairs:
+            if fp in clth:
+                cl_th[fp] = clth[fp]
+            else:
+                # reverse the order of the two fields
+                cl_th[fp] = clth[fp[::-1]]
 
-        s = sacc.Sacc.load_fits(f"{sacc_dir}/cl_and_cov_sacc{sim_label}.fits")
+        clth_binned = binned_theory_from_unbinned(cl_th, bpw_mats[(ms1, ms2)])
+
+        ftag1 = meta.filtering_tag_from_map_set(ms1)
+        ftag2 = meta.filtering_tag_from_map_set(ms2)
+
+        for fp in field_pairs:
+            mask_th = (clth["l"] <= 2 * meta.nside - 1)
+            x_th, y_th = clth["l"][mask_th], cl_th[fp][mask_th]
+
+            idx_bad = idx_bad_tf[ftag1, ftag2][fp]
+            mask = ((np.arange(len(lb)) > idx_bad) &
+                    (lb <= 2 * meta.nside - 1))
+            th_binned = clth_binned[fp][mask]
+
+            plot_sims[ms1, ms2, fp]["x_th"] = x_th
+            plot_sims[ms1, ms2, fp]["y_th"] = y_th
+            plot_sims[ms1, ms2, fp]["th_binned"] = th_binned
+
+    # Load data
+    plot_data = {
+        (ms1, ms2, fp): {
+            "y": None,
+        } for ms1, ms2 in ps_names
+        for fp in field_pairs
+    }
+    fname_data = f"{sacc_dir}/cl_and_cov_sacc.fits"
+
+    if not os.path.isfile(fname_data):
+        print("No data sacc to print. Skipping...")
+    else:
+        s = sacc.Sacc.load_fits(fname_data)
 
         for ms1, ms2 in ps_names:
             ftag1 = meta.filtering_tag_from_map_set(ms1)
@@ -214,36 +261,65 @@ def main(args):
                 x, y, err = x[mask], y[mask], err[mask]
 
                 plot_data[ms1, ms2, fp]["x"] = x
-                plot_data[ms1, ms2, fp]["y"].append(y)
+                plot_data[ms1, ms2, fp]["y"] = y
                 plot_data[ms1, ms2, fp]["err"] = err
-                plot_data[ms1, ms2, fp]["title"] = f"{ms1} x {ms2} - {fp}"
-                plot_data[ms1, ms2, fp]["ylabel"] = fp
 
-    for ms1, ms2 in ps_names:
+    # Load simulations
+    for id_sim in range(Nsims):
         if verbose:
             print(f"# {id_sim} | {ms1} x {ms2}")
+        s = sacc.Sacc.load_fits(
+            f"{sacc_dir}/cl_and_cov_sacc_{id_sim:04d}.fits"
+        )
+
+        for ms1, ms2 in ps_names:
+            ftag1 = meta.filtering_tag_from_map_set(ms1)
+            ftag2 = meta.filtering_tag_from_map_set(ms2)
+
+            for fp in field_pairs:
+                f1, f2 = fp
+
+                ell, cl, cov = s.get_ell_cl(
+                    f"cl_{types[f1]}{types[f2]}",
+                    ms1,
+                    ms2,
+                    return_cov=True)
+
+                idx_bad = idx_bad_tf[ftag1, ftag2][fp]
+                mask = (
+                    (np.arange(len(ell)) > idx_bad) &
+                    (ell <= 2 * meta.nside - 1))
+                x, y, err = ell, cl, np.sqrt(cov.diagonal())
+                x, y, err = x[mask], y[mask], err[mask]
+
+                plot_sims[ms1, ms2, fp]["x"] = x
+                plot_sims[ms1, ms2, fp]["y"].append(y)
+                plot_sims[ms1, ms2, fp]["err"] = err
+                plot_sims[ms1, ms2, fp]["title"] = f"{ms1} x {ms2} - {fp}"
+                plot_sims[ms1, ms2, fp]["ylabel"] = fp
+
+    for ms1, ms2 in ps_names:
         for fp in field_pairs:
 
-            plot_data[ms1, ms2, fp]["y"] = np.mean(
-                plot_data[ms1, ms2, fp]["y"], axis=0
+            plot_sims[ms1, ms2, fp]["y"] = np.mean(
+                plot_sims[ms1, ms2, fp]["y"], axis=0
             )
-            plot_data[ms1, ms2, fp]["err"] /= np.sqrt(Nsims)
-            if args.sims:
-                plot_name = f"plot_cells_sims_{ms1}_{ms2}_{fp}.pdf"
-            if args.data:
-                plot_name = f"plot_cells_data_{ms1}_{ms2}_{fp}.pdf"
+            plot_sims[ms1, ms2, fp]["err"] /= np.sqrt(Nsims)
+            plot_name = f"plot_cells_{ms1}_{ms2}_{fp}.pdf"
 
             plot_spectrum(
-                plot_data[ms1, ms2, fp]["x"],
-                plot_data[ms1, ms2, fp]["y"],
-                plot_data[ms1, ms2, fp]["err"],
-                title=plot_data[ms1, ms2, fp]["title"],
-                ylabel=plot_data[ms1, ms2, fp]["ylabel"],
+                plot_sims[ms1, ms2, fp]["x"],
+                plot_sims[ms1, ms2, fp]["y"],
+                plot_sims[ms1, ms2, fp]["err"],
+                cb_data=plot_data[ms1, ms2, fp]["y"],
+                cb_data_err=plot_data[ms1, ms2, fp]["err"],
+                title=plot_sims[ms1, ms2, fp]["title"],
+                ylabel=plot_sims[ms1, ms2, fp]["ylabel"],
                 xlim=(30, 2 * meta.nside - 1),
-                add_theory=args.sims,
-                lth=plot_data[ms1, ms2, fp]["x_th"],
-                clth=plot_data[ms1, ms2, fp]["y_th"],
-                cbth=plot_data[ms1, ms2, fp]["th_binned"],
+                add_theory=True,
+                lth=plot_sims[ms1, ms2, fp]["x_th"],
+                clth=plot_sims[ms1, ms2, fp]["y_th"],
+                cbth=plot_sims[ms1, ms2, fp]["th_binned"],
                 save_file=f"{plot_dir}/{plot_name}"
             )
 
@@ -253,9 +329,5 @@ if __name__ == '__main__':
     parser.add_argument("--globals", type=str,
                         help="Path to the global configuration file")
     parser.add_argument("--verbose", action="store_true", help="Verbose mode.")
-
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--sims", action="store_true")
-    mode.add_argument("--data", action="store_true")
     args = parser.parse_args()
     main(args)
