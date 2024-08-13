@@ -24,52 +24,61 @@ def main(args):
 
     masks_settings = meta.masks
 
-    # First loop over the (map_set, id_bundles)
-    # pairs to define a common binary mask
-    hit_maps = []
-    for map_set in meta.map_sets_list:
-        n_bundles = meta.n_bundles_from_map_set(map_set)
-        for id_bundle in range(n_bundles):
+    if meta.masks["global_hits"] is None:
+        # Loop over the (map_set, id_bundles)
+        # pairs to define a common binary mask
+        hit_maps = []
+        for map_set in meta.map_sets_list:
+            n_bundles = meta.n_bundles_from_map_set(map_set)
+            for id_bundle in range(n_bundles):
 
-            map_dir = meta.map_dir_from_map_set(map_set)
-            map_template = meta.map_template_from_map_set(map_set)
+                map_dir = meta.map_dir_from_map_set(map_set)
+                map_template = meta.map_template_from_map_set(map_set)
 
-            map_file = map_template.replace(
-                "{id_bundle}",
-                str(id_bundle)
-            )
-            type_options = [
-                f for f in re.findall(r"\{.*?\}", map_template)
-                if "|" in f
-            ]
-            if not type_options:
-                raise ValueError("The map directory must contain both maps "
-                                 "and hits files, indicated by a "
-                                 "corresponding suffix.")
-            else:
-                # Select the hitmap
-                option = type_options[0].replace("{", "")
-                option = option.replace("}", "").split("|")[1]
-
-                map_file = map_file.replace(
-                    type_options[0],
-                    option
+                map_file = map_template.replace(
+                    "{id_bundle}",
+                    str(id_bundle)
                 )
+                type_options = [
+                    f for f in re.findall(r"\{.*?\}", map_template)
+                    if "|" in f
+                ]
+                if not type_options:
+                    raise ValueError(
+                        "The map directory must contain both maps "
+                        "and hits files, indicated by a "
+                        "corresponding suffix."
+                    )
+                else:
+                    # Select the hitmap
+                    option = type_options[0].replace("{", "")
+                    option = option.replace("}", "").split("|")[1]
 
-            print(f"Reading hitmap for {map_set} - bundle {id_bundle}")
-            if verbose:
-                print(f"    file_name: {map_dir}/{map_file}")
+                    map_file = map_file.replace(
+                        type_options[0],
+                        option
+                    )
 
-            hits = mu.read_map(f"{map_dir}/{map_file}")
-            hit_maps.append(hits)
+                print(f"Reading hitmap for {map_set} - bundle {id_bundle}")
+                if verbose:
+                    print(f"    file_name: {map_dir}/{map_file}")
 
-    # Create binary and normalized hitmap
-    binary = np.ones_like(hit_maps[0])
-    sum_hits = np.zeros_like(hit_maps[0])
-    for hit_map in hit_maps:
-        binary[hit_map == 0] = 0
-        sum_hits += hit_map
-    sum_hits[binary == 0] = 0
+                hits = mu.read_map(f"{map_dir}/{map_file}")
+                hit_maps.append(hits)
+
+        # Create binary and normalized hitmap
+        binary = np.ones_like(hit_maps[0])
+        sum_hits = np.zeros_like(hit_maps[0])
+        for hit_map in hit_maps:
+            binary[hit_map == 0] = 0
+            sum_hits += hit_map
+        sum_hits[binary == 0] = 0
+
+    else:
+        # Read global hits map from disk
+        sum_hits = mu.read_map(meta.masks["global_hits"])
+        binary = np.ones_like(sum_hits)
+        binary[sum_hits == 0] = 0
 
     # Normalize and smooth hitmaps
     sum_hits = hp.smoothing(sum_hits, fwhm=np.deg2rad(1.))
