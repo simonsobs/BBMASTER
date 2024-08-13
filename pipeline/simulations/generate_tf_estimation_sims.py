@@ -1,7 +1,7 @@
 import argparse
 from soopercool import BBmeta, utils
 from soopercool import mpi_utils as mpi
-from soopercool import mpi_utils as mu
+from soopercool import map_utils as mu
 import numpy as np
 import healpy as hp
 import matplotlib.pyplot as plt
