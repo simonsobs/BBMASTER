@@ -1,0 +1,126 @@
+## General output directory where all products are stored
+output_directory: &out_dir /pscratch/sd/k/kwolz/share/SOOPERCOOL/tutorial_planck
+
+#########################
+# Map sets to correlate #
+#########################
+map_sets:
+  planck_f100:
+    map_dir: !path [*out_dir, maps]
+    beam_dir: !path [*out_dir, beams]
+    map_template: planck_f100_bundle{id_bundle}_{map|hits}.fits
+    beam_file: beam_planck_f100.dat
+    n_bundles: 2          # Number of bundles
+    freq_tag: 100         # Freq. tag (e.g. useful to coadd freqs)
+    exp_tag: Planck      # Experiment tag (useful to get noise-bias free cross-split spectra)
+    filtering_tag: mcut0
+  planck_f143:
+    map_dir: !path [*out_dir, maps]
+    beam_dir: !path [*out_dir, beams]
+    map_template: planck_f143_bundle{id_bundle}_{map|hits}.fits
+    beam_file: beam_planck_f143.dat
+    n_bundles: 2
+    freq_tag: 143
+    exp_tag: Planck
+    filtering_tag: mcut0
+
+####################
+# Masking metadata #
+####################
+masks:
+  analysis_mask: !path [*out_dir, masks/analysis_mask.fits]
+
+  # Use global hits map instead of searching over bundle-specific hits
+  # (not recommended to use on real SAT data)
+  global_hits: /global/cfs/projectdirs/sobs/www/users/so_bb/norm_nHits_SA_35FOV_ns512.fits
+
+  # Path to products (binary)
+  galactic_mask: null  # "/path/to/galactic_mask.fits"
+  point_source_catalog: null
+  point_source_mask: /pscratch/sd/k/kwolz/share/SOOPERCOOL/masks/npipe_mask_ecliptic_nside512.fits
+
+  external_mask: null
+
+  apod_radius: 10.0
+  apod_radius_point_source: 1.0
+  apod_type: "C2"
+
+####################################
+# Metadata related to the analysis #
+####################################
+## General parameters
+general_pars:
+  pix_type: hp
+  nside: 512
+  lmin: 30
+  lmax: 600
+  binning_file: !path [*out_dir, binning/binning_nside512_deltal10.npz]
+  pure_B: True
+  # Where the beam window is lower than beam_floor, set it to beam_floor
+  beam_floor: 1.e-5
+
+## Filtering-related parameters
+filtering:
+
+  ## Define filtering tags
+  tags_settings:
+
+    # This is a dummy filter that leaves power spectra unchanged
+    mcut0:
+      # Filtering parameters
+      filtering_type: "m_filterer"
+      m_cut: 0
+
+## Transfer-function-related metadata
+transfer_settings:
+  transfer_directory: !path [*out_dir, transfer_functions]
+
+  # For estimation
+  ## Number of sims for tf estimation
+  tf_est_num_sims: 10
+
+  ## Parameters of the PL sims used for TF estimation
+  power_law_pars_tf_est:
+    amp: 1.0
+    delta_ell: 10
+    power_law_index: 2.
+
+  ## Optional beams applied on PL sims
+  # If true, beams will be applied only on the validation simulations. By default (false)
+  # beam are applied to both the estimation and validation sims,
+  # to account for potential effect of the beam on the TF (e.g. commutativity)
+  do_not_beam_est_sims: False
+  beams_list: ["planck_f100", "planck_f143"]
+
+  ## Path to the sims for TF estimation
+  unfiltered_map_dir:
+    mcut0: !path [*out_dir, tf_est_sims]
+  unfiltered_map_template:
+    mcut0: "{pure_type}_power_law_tf_est_{id_sim:04d}_planck_f100.fits"
+  filtered_map_dir:
+    mcut0: !path [*out_dir, tf_est_sims]
+  filtered_map_template:
+    mcut0: "{pure_type}_power_law_tf_est_{id_sim:04d}_planck_f100.fits"
+
+# Covariance-related parameters
+covariance:
+  ## Number of sims for covariance estimation
+  cov_num_sims: 100
+
+  ## Directories and file names of simulated noise maps
+  noise_map_sims_dir:
+    planck_f100: /pscratch/sd/k/kwolz/share/SOOPERCOOL/tutorial_planck/noise_sims
+    planck_f143: /pscratch/sd/k/kwolz/share/SOOPERCOOL/tutorial_planck/noise_sims
+
+  noise_map_sims_template:
+    planck_f100: "{id_sim:04d}/{map_set}_bundle{id_bundle}_noise.fits"
+    planck_f143: "{id_sim:04d}/{map_set}_bundle{id_bundle}_noise.fits"
+
+  ## Directories and file names of simulated signal alms
+  signal_alm_sims_dir: !path [*out_dir, signal_sims/sims]
+  signal_alm_sims_template: "{id_sim:04d}/alm_{freq_tag:03d}GHz_lmax1535_{id_sim:04d}.fits"
+
+  ## Fits files with simulation input power spectra (in healpy format)
+  fiducial_cmb: "/pscratch/sd/k/kwolz/share/SOOPERCOOL/tutorial_planck/signal_sims/cls/Cls_Planck2018_r0.fits"
+  fiducial_dust: "/pscratch/sd/k/kwolz/share/SOOPERCOOL/tutorial_planck/signal_sims/cls/cl_dust_f{nu1:03d}_f{nu2:03d}.fits"
+  fiducial_synch: "/pscratch/sd/k/kwolz/share/SOOPERCOOL/tutorial_planck/signal_sims/cls/cl_synch_f{nu1:03d}_f{nu2:03d}.fits"
