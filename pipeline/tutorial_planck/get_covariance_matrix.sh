@@ -10,8 +10,7 @@ export OMP_PLACES=threads
 export OMP_PROC_BIND=spread
 
 # Co-add signal and noise bundle simulations
-#srun -n 10 -c 24 
-python simulations/coadd_simulated_maps.py --globals ${paramfile} --verbose
+srun -n 10 -c 24 python simulations/coadd_simulated_maps.py --globals ${paramfile} --verbose
 
 # Compute cross-bundle spectra from sims
 srun -n 10 -c 24 python compute_sims_pseudo_cells.py --globals ${paramfile} --verbose
