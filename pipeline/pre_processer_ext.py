@@ -46,7 +46,7 @@ def pre_processer(args):
 
     directories = [output_dir, sims_dir]
     for dirs in directories:
-        os.makedirs(dirs, exist_ok=True)
+        meta.make_dir(dirs)
 
     if meta.pix_type == "car":
         raise NotImplementedError("Can only accept healpix for now.")
@@ -69,7 +69,7 @@ def pre_processer(args):
 
         print("Beams")
         bdir = meta.beam_dir_from_map_set(meta.map_sets_list[0])
-        os.makedirs(bdir, exist_ok=True)
+        meta.make_dir(bdir)
         beam_windows_dir = f"{bdir}/simulated_maps/npipe_aux/beam_window_functions"  # noqa
 
         # Download Planck NPIPE RIMO from URL and save temporarily
@@ -95,7 +95,7 @@ def pre_processer(args):
 
         beams = {}
         for map_set in meta.map_sets_list:
-            if 'planck' not in map_set:
+            if "planck" not in meta.exp_tag_from_map_set(map_set).lower():
                 continue
             print(map_set)
             f = str(meta.freq_tag_from_map_set(map_set)).zfill(3)
@@ -185,7 +185,7 @@ def pre_processer(args):
 
         if args.data:
             for map_set in meta.map_sets_list:
-                if 'wmap' not in map_set:
+                if "wmap" not in meta.exp_tag_from_map_set(map_set).lower():
                     continue
                 f = str(meta.freq_tag_from_map_set(map_set)).zfill(3)
 
@@ -216,7 +216,7 @@ def pre_processer(args):
                 url = f"{url_pref}/wmap_temperature_kq85_analysis_mask_r9_9yr_v5.fits"  # noqa
                 fname_mask = f"{output_dir}/masks/wmap_temperature_analysis_mask.fits"  # noqa
 
-                os.makedirs(f"{output_dir}/masks", exist_ok=True)
+                meta.make_dir(f"{output_dir}/masks")
                 if not os.path.isfile(fname_mask):
                     wget.download(url, fname_mask)
                     print("\n")
@@ -262,13 +262,13 @@ def pre_processer(args):
 
         for map_set in meta.map_sets_list:
             if args.planck:
-                if "planck" not in map_set:
+                if "planck" not in meta.exp_tag_from_map_set(map_set).lower():
                     continue
                 # original nside
                 f = str(meta.freq_tag_from_map_set(map_set)).zfill(3)
                 nside_in = 1024 if f == '030' else 2048
             elif args.wmap:
-                if "wmap" not in map_set:
+                if "wmap" not in meta.exp_tag_from_map_set(map_set).lower():
                     continue
                 nside_in = 512
 
@@ -290,13 +290,12 @@ def pre_processer(args):
                     fname_in = f"{npipe_dir}/npipe6v20{bundle}/npipe6v20{bundle}_{f}_map.fits"  # noqa
                     fname_alms = f"{map_dir}/npipe6v20{bundle}/alms_npipe6v20{bundle}_{f}_map_ns{nside_in}.npz"  # noqa
                     fname_out = f"{map_dir}/{map_set}_bundle{bundles_dict[bundle]}_map.fits"  # noqa
-                    os.makedirs(f"{map_dir}/npipe6v20{bundle}", exist_ok=True)
+                    meta.make_dir(f"{map_dir}/npipe6v20{bundle}")
                 elif args.wmap:
                     fname_in = f"{map_dir}/wmap_{bands_dict[f]}/wmap_iqumap_r9_yr{bundle}_{bands_dict[f]}_v5.fits"  # noqa
                     fname_alms = f"{map_dir}/wmap_{bands_dict[f]}/alms_wmap_{bands_dict[f]}_yr{bundle}_map_{nside_in}.npz"  # noqa
                     fname_out = f"{map_dir}/{map_set}_bundle{bundle-1}_map.fits"  # noqa
-                    os.makedirs(f"{map_dir}/wmap_{bands_dict[f]}",
-                                exist_ok=True)
+                    meta.make_dir(f"{map_dir}/wmap_{bands_dict[f]}")
 
                 if os.path.isfile(fname_out):
                     print("maps already processed, found in", map_dir)
@@ -385,17 +384,18 @@ def pre_processer(args):
             sim_id_in = sim_id+200 if process_sims else sim_id
 
             # sims output dirs
-            os.makedirs(f"{sims_dir}/{sim_id:04d}", exist_ok=True)
+            meta.make_dir(f"{sims_dir}/{sim_id:04d}")
 
             for map_set in meta.map_sets_list:
-                if "planck" not in map_set and "wmap" not in map_set:
+                if (("planck" not in meta.exp_tag_from_map_set(map_set).lower())  # noqa
+                    and ("wmap" not in meta.exp_tag_from_map_set(map_set).lower())):  # noqa
                     continue
 
                 if args.noise:
                     # noise output dirs
                     noise_dir = meta.covariance["noise_map_sims_dir"][map_set]
                     noise_dir += f"/{sim_id:04d}"
-                    os.makedirs(noise_dir, exist_ok=True)
+                    meta.make_dir(noise_dir)
 
                 f = str(meta.freq_tag_from_map_set(map_set)).zfill(3)
                 # original nside
