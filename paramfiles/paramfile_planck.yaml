@@ -1,16 +1,13 @@
 ## General output directory where all products are stored
-output_directory: &out_dir /pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/test
-
-## Input directory where to read from
-input_directory: &in_dir /pscratch/sd/k/kwolz/share/SOOPERCOOL/tutorial_planck
+output_directory: &out_dir /path/to/your/own/directory  ## Replace by your own path
 
 #########################
 # Map sets to correlate #
 #########################
 map_sets:
   planck_f100:
-    map_dir: !path [*in_dir, maps]
-    beam_dir: !path [*in_dir, beams]
+    map_dir: !path [*out_dir, maps]
+    beam_dir: !path [*out_dir, beams]
     map_template: planck_f100_bundle{id_bundle}_{map|hits}.fits
     beam_file: beam_planck_f100.dat
     n_bundles: 2          # Number of bundles
@@ -18,8 +15,8 @@ map_sets:
     exp_tag: Planck      # Experiment tag (useful to get noise-bias free cross-split spectra)
     filtering_tag: mcut0
   planck_f143:
-    map_dir: !path [*in_dir, maps]
-    beam_dir: !path [*in_dir, beams]
+    map_dir: !path [*out_dir, maps]
+    beam_dir: !path [*out_dir, beams]
     map_template: planck_f143_bundle{id_bundle}_{map|hits}.fits
     beam_file: beam_planck_f143.dat
     n_bundles: 2
@@ -31,7 +28,7 @@ map_sets:
 # Masking metadata #
 ####################
 masks:
-  analysis_mask: !path [*in_dir, masks/analysis_mask.fits]
+  analysis_mask: !path [*out_dir, masks/analysis_mask.fits]
 
   # Use global hits map instead of searching over bundle-specific hits
   # (not recommended to use on real SAT data)
@@ -57,7 +54,7 @@ general_pars:
   nside: 512
   lmin: 30
   lmax: 600
-  binning_file: !path [*in_dir, binning/binning_nside512_deltal10.npz]
+  binning_file: !path [*out_dir, binning/binning_nside512_deltal10.npz]
   pure_B: True
   # Where the beam window is lower than beam_floor, set it to beam_floor
   beam_floor: 1.e-5
@@ -76,7 +73,7 @@ filtering:
 
 ## Transfer-function-related metadata
 transfer_settings:
-  transfer_directory: !path [*in_dir, transfer_functions]
+  transfer_directory: !path [*out_dir, transfer_functions]
 
   # For estimation
   ## Number of sims for tf estimation
@@ -97,11 +94,11 @@ transfer_settings:
 
   ## Path to the sims for TF estimation
   unfiltered_map_dir:
-    mcut0: !path [*in_dir, tf_est_sims]
+    mcut0: !path [*out_dir, tf_est_sims]
   unfiltered_map_template:
     mcut0: "{pure_type}_power_law_tf_est_{id_sim:04d}_planck_f100.fits"
   filtered_map_dir:
-    mcut0: !path [*in_dir, tf_est_sims]
+    mcut0: !path [*out_dir, tf_est_sims]
   filtered_map_template:
     mcut0: "{pure_type}_power_law_tf_est_{id_sim:04d}_planck_f100.fits"
 
@@ -112,15 +109,15 @@ covariance:
 
   ## Directories and file names of simulated noise maps
   noise_map_sims_dir:
-    planck_f100: /pscratch/sd/k/kwolz/share/SOOPERCOOL/tutorial_planck/noise_sims
-    planck_f143: /pscratch/sd/k/kwolz/share/SOOPERCOOL/tutorial_planck/noise_sims
+    planck_f100: !path [*out_dir, noise_sims]
+    planck_f143: !path [*out_dir, noise_sims]
 
   noise_map_sims_template:
     planck_f100: "{id_sim:04d}/{map_set}_bundle{id_bundle}_noise.fits"
     planck_f143: "{id_sim:04d}/{map_set}_bundle{id_bundle}_noise.fits"
 
   ## Directories and file names of simulated signal alms
-  signal_alm_sims_dir: !path [*in_dir, signal_sims/sims]
+  signal_alm_sims_dir: !path [*out_dir, signal_sims/sims]
   signal_alm_sims_template: "{id_sim:04d}/alm_{freq_tag:03d}GHz_lmax1535_{id_sim:04d}.fits"
 
   ## Fits files with simulation input power spectra (in healpy format)
