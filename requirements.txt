@@ -1,7 +1,7 @@
 numpy
 scipy
 healpy
-pymaster
+# pymaster  # when running at NERSC, use conda environment with namaster
 sacc
 camb
 Jinja2
