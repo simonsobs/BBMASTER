@@ -4,9 +4,16 @@ output_directory: &out_dir /path/to/your/own/directory  ## Replace by your own p
 #########################
 # Map sets to correlate #
 #########################
+# Map sets are broadly defined as the maps that we want to compute power
+# spectra from. Examples are "planck_f100", "planck_f143", "satp1_f093" etc.
 map_sets:
+  # Each map set contains several attributed listed below. Every one of them
+  # can be accessed using the convenience member function
+  # get_{attribute}_from_map_set(map_set) of the class soopercool.BBmeta
   planck_f100:
+    # Directory where the data maps are stored
     map_dir: !path [*out_dir, maps]
+    # Directory where beam window functions are stored
     beam_dir: !path [*out_dir, beams]
     # The file name template for maps. The parameter id_bundle will be
     # recognized when written inside braces, and interpreted during python
@@ -15,10 +22,17 @@ map_sets:
     # hits map.
     map_template: planck_f100_bundle{id_bundle}_{map|hits}.fits
     beam_file: beam_planck_f100.dat
+    # Every map set contains n_bundles bundles that are assumed to have
+    # compatible but independent noise properties such that cross-bundle
+    # splits do not contain noise bias.
     n_bundles: 2          # Number of bundles
-    freq_tag: 100         # Freq. tag (e.g. useful to coadd freqs)
+    freq_tag: 100         # Frequency in GHz (e.g. useful for coadding
+                          # channels)
     exp_tag: Planck       # Experiment tag (useful to get noise-bias free
                           # cross-split spectra)
+    # Filtering tags are labels that we associate to a given filter. Different
+    # map sets can be associated to different filters, defined below under the
+    # key "filtering" below.
     filtering_tag: mcut0
   planck_f143:
     map_dir: !path [*out_dir, maps]
@@ -85,16 +99,16 @@ transfer_settings:
   ## Number of sims for tf estimation
   tf_est_num_sims: 10
 
-  ## Parameters of the PL sims used for TF estimation
+  ## Parameters of the Gaussian power-law sims used for TF estimation
   power_law_pars_tf_est:
     amp: 1.0
     delta_ell: 10
     power_law_index: 2.
 
-  ## Optional beams applied on PL sims
-  # If true, beams will be applied only on the validation simulations. By default (false)
-  # beam are applied to both the estimation and validation sims,
-  # to account for potential effect of the beam on the TF (e.g. commutativity)
+  ## Optional beams applied on TF sims
+  # If true, beams will not be applied on the transfer estimation simulations. 
+  # By default (False), beams are applied to account for potential effect of
+  # the beam on the TF (e.g. commutativity)
   do_not_beam_est_sims: False
   beams_list: ["planck_f100", "planck_f143"]
 
