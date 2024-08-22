@@ -200,7 +200,7 @@ if __name__ == "__main__":
     parser.add_argument("--globals", help="Path to the paramfile")
     parser.add_argument("--verbose", help="Verbose mode",
                         action="store_true")
-    parser.add_argument("--no-plots", help="Plot the results",
+    parser.add_argument("--no-plots", help="Do not plot the results",
                         action="store_true")
 
     args = parser.parse_args()

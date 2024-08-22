@@ -8,11 +8,17 @@ map_sets:
   planck_f100:
     map_dir: !path [*out_dir, maps]
     beam_dir: !path [*out_dir, beams]
+    # The file name template for maps. The parameter id_bundle will be
+    # recognized when written inside braces, and interpreted during python
+    # string formatting. Similarly, {par1|par2} will be replaced by the string
+    # "par1" if the file contains a map, and by "par2" if the file contains a
+    # hits map.
     map_template: planck_f100_bundle{id_bundle}_{map|hits}.fits
     beam_file: beam_planck_f100.dat
     n_bundles: 2          # Number of bundles
     freq_tag: 100         # Freq. tag (e.g. useful to coadd freqs)
-    exp_tag: Planck      # Experiment tag (useful to get noise-bias free cross-split spectra)
+    exp_tag: Planck       # Experiment tag (useful to get noise-bias free
+                          # cross-split spectra)
     filtering_tag: mcut0
   planck_f143:
     map_dir: !path [*out_dir, maps]
@@ -95,6 +101,9 @@ transfer_settings:
   ## Path to the sims for TF estimation
   unfiltered_map_dir:
     mcut0: !path [*out_dir, tf_est_sims]
+  # The file name template for transfer estimation sims. The parameters
+  # pure_type and id_sim will be recognized when written inside braces,
+  # and interpreted during python string formatting.
   unfiltered_map_template:
     mcut0: "{pure_type}_power_law_tf_est_{id_sim:04d}_planck_f100.fits"
   filtered_map_dir:
@@ -112,12 +121,17 @@ covariance:
     planck_f100: !path [*out_dir, noise_sims]
     planck_f143: !path [*out_dir, noise_sims]
 
+  # The file name templates for noise sims. The parameters id_sim, map_set, and
+  # id_bundle will be recognized when written inside braces, and interpreted
+  # during python string formatting.
   noise_map_sims_template:
     planck_f100: "{id_sim:04d}/{map_set}_bundle{id_bundle}_noise.fits"
     planck_f143: "{id_sim:04d}/{map_set}_bundle{id_bundle}_noise.fits"
 
   ## Directories and file names of simulated signal alms
   signal_alm_sims_dir: !path [*out_dir, signal_sims/sims]
+  # The parameters id_sim, freq_tag, and id_sim will be recognized during 
+  # python string formatting if written inside braces.
   signal_alm_sims_template: "{id_sim:04d}/alm_{freq_tag:03d}GHz_lmax1535_{id_sim:04d}.fits"
 
   ## Fits files with simulation input power spectra (in healpy format)
